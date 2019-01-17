@@ -1,17 +1,10 @@
 # Earnin DevOps Challenge
 
-In this challenge, we create the means with which developers can run a
-self-contained script that ingests raw data from S3 and writes the processed
-data to an RDS (Amazon Relational Database Service) instance in an existing VPC.
+In this challenge, we create the means with which developers can run a self-contained script that ingests raw data from S3 and writes the processed data to an RDS (Amazon Relational Database Service) instance in an existing VPC.
 
-The script runs daily for 1 hour. It is important that this solution be cost efficient, only
-requiring resources when the script is running. For this reason, I have chosen to implement the
-script via an Amazon Lambda function. AWS Lambda allows our developers to run their job daily while we only
-pay for resources while they are in use. Lambda also allows us to automatically retry the script in case of failure,
-and dig into error logs with CloudWatch if errors persist.
+The script runs daily for 1 hour. It is important that this solution be cost efficient, only requiring resources when the script is running. For this reason, I have chosen to implement the script via an Amazon Lambda function. AWS Lambda allows our developers to run their job daily while we only pay for resources while they are in use. Lambda also allows us to automatically retry the script in case of failure, and dig into error logs with CloudWatch if errors persist.
 
-I have separated steps into "Cloud Ops" and "Developer", but the goal would be to empower developers to
-deploy and monitor their own Lambda function in an automated way.
+I have separated steps into "Cloud Ops" and "Developer", but the goal would be to empower developers to deploy and monitor their own Lambda function in an automated way.
 
 ## Assumptions
 
@@ -35,8 +28,7 @@ For the purpose of this challenge, I am making the following assumptions:
 
 ### Create Lambda Policy and Role
 
-Create a policy that allows Lambda to interact with S3 and execute on EC2 within the same VPC as the RDS instance. Here is the policy in json format,
-which we can call `lambdaPolicy.json`. Note that these EC2 network interfaces allow for secure deployment of the Lambda function.
+Create a policy that allows Lambda to interact with S3 and execute on EC2 within the same VPC as the RDS instance. Here is the policy in json format, which we can call `lambdaPolicy.json`. Note that these EC2 network interfaces allow for secure deployment of the Lambda function.
 
 ```json
 {
@@ -135,8 +127,7 @@ where `targets.json` looks like:
 
 ## Steps for Developers to Take to Integrate with Lambda
 
-This is a walkthrough to empower developers to deploy their script with Lambda themselves. This gives developers ownership over the 
-deployment and monitoring of the service, but with clear guidance.
+This is a walkthrough to empower developers to deploy their script with Lambda themselves. This gives developers ownership over the deployment and monitoring of the service, but with clear guidance.
 
 1. Package the code with all necessary libraries by using a virtual environment
 2. Deploy the Lambda function using AWS CLI
@@ -146,11 +137,9 @@ deployment and monitoring of the service, but with clear guidance.
 * Important: For consistency and reproducability, give the main function of the script the name "handler"
 * Important: Use environment variables so that database credentials and other secure information isn't hardcoded
 
-If it is important that the main function be named something else,
-then replace references to "handler" with the name of the main function of the script.
+If it is important that the main function be named something else, then replace references to "handler" with the name of the main function of the script.
 
-It is important to develop the script using the virtual environment `virtualenv` so that all necessary dependencies can be zipped together
-with the source code for the Lambda function to have everything it needs to run the code. [This section of Python's virtual environment docs](https://docs.python-guide.org/dev/virtualenvs/#lower-level-virtualenv) has the documentation for developing within a virtual environment.
+It is important to develop the script using the virtual environment `virtualenv` so that all necessary dependencies can be zipped together with the source code for the Lambda function to have everything it needs to run the code. [This section of Python's virtual environment docs](https://docs.python-guide.org/dev/virtualenvs/#lower-level-virtualenv) has the documentation for developing within a virtual environment.
 
 Zip the contents of the `<virtual env folder>/lib/python3.6/site-packages/` subdirectory within your virtual environement along with our script `dailyLambda.py`:
 
@@ -212,26 +201,17 @@ outputfile.txt  # review the output file to see if the function is working as ex
 
 ### What If the Job Fails?
 
-By default, Lambda functions retry a couple of times automatically if they fail. But what if there are too many retries? To monitor this situation,
-we can update the function with a [Dead Letter Queue](https://docs.aws.amazon.com/lambda/latest/dg/dlq.html) configuration. To inspect the failed jobs,
-we could create an Amazon Simple Notifcation Service (SNS) topic and use its ARN in the Lambda function's DeadLetterConfig parameter. We would also need to
-modify the Lambda function's execution role to include permissions to publish to SNS.
+By default, Lambda functions retry a couple of times automatically if they fail. But what if there are too many retries? To monitor this situation, we can update the function with a [Dead Letter Queue](https://docs.aws.amazon.com/lambda/latest/dg/dlq.html) configuration. To inspect the failed jobs, we could create an Amazon Simple Notifcation Service (SNS) topic and use its ARN in the Lambda function's DeadLetterConfig parameter. We would also need to modify the Lambda function's execution role to include permissions to publish to SNS.
 
 ### Things I Want to Improve
 
-With the lambda execution role `lambdaRole`, the and the CloudWatch trigger `daily-lambda-rule` created, it would be fairly simple to automate future similar deployments
-of Lambda functions that operate daily. We would create a straightforward script that takes the inputs that may change from one deployment to the next:
+With the lambda execution role `lambdaRole`, the and the CloudWatch trigger `daily-lambda-rule` created, it would be fairly simple to automate future similar deployments of Lambda functions that operate daily. We would create a straightforward script:
 
-* The zip archive of the function
-* The account ID
-* The region
-* The subnet IDs
-* function name
-* memory size
+* Make a function that takes the zip archive of the function as an input and would deploy the Lambda function with the proper permissions from `lambdaRole`
+* Make a function that takes a CloudWatch Lambda Trigger rule `daily-lambda-rule` and the name of the lambda function and applies the trigger to the function
+* Make a main function that calls the other functions to deploy the Lambda and enable the daily trigger.
 
-and invoke the `aws lambda create-function` command with those parameters. *HOWEVER*, managing infrastructure procedurally in this way goes against
-the emerging best practice of documenting infrastructure as code. For this reason, the steps of defining the execution role, CloudWatch trigger rule,
-and Lambda function deployment can be automated and documented as code using Terraform. [Here is the Terraform code](https://github.com/hashicorp/terraform/issues/14342#issuecomment-359185390) required to do this. I decided not to focus on this terraform code because it adds an operational complexity that would require more discussion. My goal is for developers to be able to launch and monitor their own services, and in order to do that with Terraform, we would need to have an S3 backend that is integrated with DynamoDB to lock state. This is necessary to prevent various dev teams from altering the state of the infrastructure in ways that conflict. This is not an operational complexity that is worth tackling for a simple script that runs once per day. As the needs of the developers scale, it would definitely warrant revisiting a system where developers can interact with Terraform in this way.
+*HOWEVER*, managing infrastructure procedurally in this way goes against the emerging best practice of documenting infrastructure as code. For this reason, the steps of defining the execution role, CloudWatch trigger rule, and Lambda function deployment can be automated and documented as code using Terraform. [Here is the Terraform code](https://github.com/hashicorp/terraform/issues/14342#issuecomment-359185390) required to do this. I decided not to focus on this terraform code because it adds an operational complexity that would require more discussion. My goal is for developers to be able to launch and monitor their own services, and in order to do that with Terraform, we would need to have an S3 backend that is integrated with DynamoDB to lock state. This is necessary to prevent various dev teams from altering the state of the infrastructure in ways that conflict. This is not an operational complexity that is worth tackling for a simple script that runs once per day. As the needs of the developers scale, it would definitely warrant revisiting a system where developers can interact with Terraform in this way.
 
 ### Drawbacks of Lambda and Alternatives
 
@@ -241,8 +221,7 @@ AWS Lambda has a few general drawbacks:
 * Computational restriction: Allocated CPU and memory are proportional to each other and limited, which is fine for our use case as a simple daily cron job. But for very large workloads, Lambda is inappropriate. As the needs of the develoopers scale, and if the nature of the job is amenable to the map-shuffle-reduce paradigm, then it may be worth looking into Amazon's Elastic Map Reduce service to run Apache Spark jobs for highly parallelized batch processing.
 * Vendor lock-in. This is a bit of an operational pain, but GCP has its own version of serverless cloud functions, so it's not too much of an issue.
 
-An alternative to using Lambda in this way is allowing developers to create their own disposable VPC in Terraform and use [VPC peering](https://www.terraform.io/docs/providers/aws/r/vpc_peering.html) to connect to the existing VPC. This allows developers to `terraform apply` their own infrastructure and determine their own computing needs
-while also providing the flexibility and cost-effectiveness of invoking `terraform destroy` when those resources aren't needed. It does feel a bit heavy-handed to create and destroy infrastruture daily for the script, and it also loses the observability afforded by integrating Lambda with CloudWatch and Dead Letter Queues. I prefer the Lambda approach for this reason.
+An alternative to using Lambda in this way is allowing developers to create their own disposable VPC in Terraform and use [VPC peering](https://www.terraform.io/docs/providers/aws/r/vpc_peering.html) to connect to the existing VPC. This allows developers to `terraform apply` their own infrastructure and determine their own computing needs while also providing the flexibility and cost-effectiveness of invoking `terraform destroy` when those resources aren't needed. It does feel a bit heavy-handed to create and destroy infrastruture daily for the script, and it also loses the observability afforded by integrating Lambda with CloudWatch and Dead Letter Queues. I prefer the Lambda approach for this reason.
 
 Another alternative to Lambda would be to use Kubernetes. Devs could have their own cluster namespace where they deploy their job as a CronJob object. We could expose the database service to their namespace and allow them to take ownership. Kubernetes also offers by default an amazing assortment of features: efficient resource allocation, high availability, auto-recovery, zero-downtime rollouts and rollbacks, and nearly arbitrary scalability. Kubernetes would be a robust framework well beyond our simple use case. One the other hand, setting up Kubernetes would be 
 
